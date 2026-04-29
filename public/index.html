@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="EcoVoice — Give your village a voice that drives change. Track resource waste, report problems, earn development funding for rural Indian villages.">
+  <title>EcoVoice — Empowering Rural India</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/navbar.css">
+  <link rel="stylesheet" href="css/hero.css">
+  <link rel="stylesheet" href="css/sections-a.css">
+  <link rel="stylesheet" href="css/sections-b.css">
+  <link rel="stylesheet" href="css/sections-c.css">
+  <link rel="stylesheet" href="css/sections-d.css">
+  <style>
+    #villageMap{height:300px;border-radius:16px;margin-top:24px;border:1px solid rgba(255,255,255,0.1)}
+    .username-field{width:100%;height:56px;border:2px solid #e0e0e0;border-radius:16px;padding:0 16px 0 44px;font-size:16px;font-family:var(--font-body);margin-bottom:16px;transition:border-color 0.3s;background:white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' fill='%23999' viewBox='0 0 24 24'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E") 14px center no-repeat}
+    .username-field:focus{outline:none;border-color:var(--emerald)}
+    .recording-active .mic-btn{background:linear-gradient(135deg,#b71c1c,#E53935)!important;animation:micRecord 0.5s infinite alternate}
+    @keyframes micRecord{0%{transform:scale(1)}100%{transform:scale(1.1)}}
+    .voice-timer{font-size:24px;font-weight:700;color:#E53935;margin-top:8px;font-family:var(--font-accent)}
+    .toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#2D7D46;color:white;padding:16px 32px;border-radius:50px;font-weight:700;z-index:9999;animation:toastIn 0.3s ease;box-shadow:0 8px 32px rgba(0,0,0,0.2)}
+    @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+    .village-suggestions{position:absolute;top:100%;left:0;right:0;background:white;border:1px solid #ddd;border-radius:0 0 12px 12px;max-height:200px;overflow-y:auto;z-index:10;display:none}
+    .village-suggestions.show{display:block}
+    .village-suggest-item{padding:12px 16px;cursor:pointer;font-size:14px;border-bottom:1px solid #f0f0f0}
+    .village-suggest-item:hover{background:#f5fdf5}
+    .village-input-wrap{position:relative}
+  </style>
+</head>
+<body>
+
+<!-- ═══ NAVBAR ═══ -->
+<nav class="navbar" id="navbar">
+  <div class="top-bar">
+    <div class="top-bar-inner">
+      <div class="marquee">
+        <span>📞 Free Helpline: 1800-XXX-XXXX &nbsp;|&nbsp; 💬 SMS 'ECO' to 56789 &nbsp;|&nbsp; 📟 Dial *123*ECO# — No Internet Needed</span>
+        <span>📞 Free Helpline: 1800-XXX-XXXX &nbsp;|&nbsp; 💬 SMS 'ECO' to 56789 &nbsp;|&nbsp; 📟 Dial *123*ECO# — No Internet Needed</span>
+      </div>
+    </div>
+  </div>
+  <div class="nav-glass">
+    <a href="#" class="nav-logo"><span class="leaf">🌱</span> EcoVoice</a>
+    <div class="nav-links">
+      <a href="#hero">Home</a><a href="#report">Report</a><a href="#score">Score</a>
+      <a href="#suggest">Suggest</a><a href="#stories">Stories</a><a href="#footer">Contact</a>
+    </div>
+    <div class="nav-right">
+      <div class="lang-pills">
+        <span class="lang-pill active" data-lang="en">EN</span><span class="lang-pill" data-lang="hi">हिं</span>
+        <span class="lang-pill" data-lang="te">తె</span><span class="lang-pill" data-lang="kn">ಕ</span><span class="lang-pill" data-lang="pa">ਪੰ</span>
+      </div>
+      <button class="btn-listen">🔊 Listen <span class="audio-wave"><span></span><span></span><span></span><span></span></span></button>
+      <a href="#report" class="btn-report-nav">Report Now</a>
+    </div>
+    <div class="mobile-toggle" id="mobileToggle"><span></span><span></span><span></span></div>
+  </div>
+</nav>
+<div class="mobile-overlay" id="mobileOverlay"></div>
+<div class="mobile-menu" id="mobileMenu">
+  <a href="#hero">Home</a><a href="#report">Report</a><a href="#score">Score</a>
+  <a href="#suggest">Suggest</a><a href="#stories">Stories</a><a href="#footer">Contact</a>
+</div>
+
+<!-- ═══ HERO ═══ -->
+<section class="hero" id="hero">
+  <div class="hero-bg"><img src="images/hero_village.png" alt="Indian village at golden hour"></div>
+  <div class="hero-overlay"></div>
+  <div class="hero-grain"></div>
+  <canvas id="particles-canvas"></canvas>
+  <div class="hero-content">
+    <div class="hero-left">
+      <div class="hero-badge">🏆 Trusted by 2,400+ Villages Across India</div>
+      <h1 class="hero-title">Give Your Village<br>A <span class="gold">Voice</span> That<br>Drives Change</h1>
+      <p class="hero-sub">Track resource waste. Report community problems. Earn development funding. Build a better tomorrow — even without internet or a smartphone.</p>
+      <div class="hero-trust">
+        <span class="trust-pill">✅ Works on 2G</span>
+        <span class="trust-pill">✅ Any Basic Phone</span>
+        <span class="trust-pill">✅ 10+ Languages</span>
+      </div>
+      <div class="hero-ctas">
+        <a href="#report" class="btn-primary">🎤 Report a Problem Now</a>
+        <a href="#score" class="btn-secondary">📊 Check Village Score →</a>
+      </div>
+      <div class="hero-phone">
+        <span class="mic-pulse">🎙️</span>
+        Or call FREE: 1800-XXX-XXXX — Speak in your language
+      </div>
+    </div>
+    <div class="hero-right">
+      <div class="hero-card">
+        <div class="hero-card-label">🏘️ RAMPUR VILLAGE <span class="live-dot"></span> LIVE</div>
+        <svg style="position:absolute;width:0;height:0"><defs>
+          <linearGradient id="scoreGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#2D7D46"/><stop offset="100%" stop-color="#E8A838"/>
+          </linearGradient>
+        </defs></svg>
+        <div class="score-gauge">
+          <svg viewBox="0 0 200 200">
+            <circle class="gauge-bg" cx="100" cy="100" r="85"/>
+            <circle class="gauge-fill" id="heroGauge" cx="100" cy="100" r="85"/>
+          </svg>
+          <div class="score-number" id="heroScore">0</div>
+        </div>
+        <div class="score-sub">out of 1000</div>
+        <div class="badge-pill">🥈 SILVER VILLAGE</div>
+        <div class="hero-stats">
+          <span class="stat-pill">Reports ↑23%</span>
+          <span class="stat-pill">Issues ✅</span>
+          <span class="stat-pill">Rank #2</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="scroll-indicator">Scroll to explore<span class="chevron">⌄</span></div>
+</section>
+
+<!-- ═══ HOW IT WORKS ═══ -->
+<section class="how-it-works" id="how">
+  <div class="container">
+    <div class="section-label reveal">HOW ECOVOICE WORKS</div>
+    <h2 class="section-title reveal">From Problem to Progress<br>in 3 Simple Steps</h2>
+    <div class="steps-grid">
+      <div class="step-card reveal reveal-delay-1">
+        <div class="step-watermark">01</div>
+        <div class="step-icon">🎙️</div>
+        <h3>Report Your Problem</h3>
+        <p>Call our free hotline, send an SMS, or use this website. Speak in Hindi, Telugu, Tamil or 8 other languages. No smartphone needed.</p>
+        <div class="step-methods"><span class="method-pill">📞 Call</span><span class="method-pill">💬 SMS</span><span class="method-pill">🌐 Web</span></div>
+        <div class="step-connector"></div>
+      </div>
+      <div class="step-card reveal reveal-delay-2">
+        <div class="step-watermark">02</div>
+        <div class="step-icon">📊</div>
+        <h3>Track Your Score</h3>
+        <p>Your community's resource management is scored across 6 categories. See exactly where you stand and how you compare with nearby villages.</p>
+        <div class="step-methods"><span class="method-pill">6 Categories</span><span class="method-pill">Live Score</span></div>
+        <div class="step-connector"></div>
+      </div>
+      <div class="step-card reveal reveal-delay-3">
+        <div class="step-watermark">03</div>
+        <div class="step-icon">💡</div>
+        <h3>Get Development Help</h3>
+        <p>Receive AI-powered suggestions, connect to government schemes, and unlock funding based on your community score.</p>
+        <div class="step-methods"><span class="method-pill">🏛️ 12+ Govt. Schemes</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ REPORT ═══ -->
+<section class="report-section" id="report">
+  <div class="report-left">
+    <img src="images/report_illustration.png" alt="Village elder reporting">
+    <div class="report-float-stats">
+      <div class="float-stat reveal"><span>📢</span> 34,291 Reports Submitted</div>
+      <div class="float-stat reveal reveal-delay-1"><span>✅</span> 18,543 Issues Resolved</div>
+      <div class="float-stat reveal reveal-delay-2"><span>🏘️</span> 2,400 Villages Active</div>
+    </div>
+  </div>
+  <div class="report-right">
+    <div class="section-label">REPORT A PROBLEM</div>
+    <h2 class="section-title" style="margin-bottom:24px">Your Voice Matters</h2>
+    <div class="method-tabs">
+      <button class="method-tab active" data-tab="voice">🎤 Voice Record</button>
+      <button class="method-tab" data-tab="text">✍️ Type Message</button>
+      <button class="method-tab" data-tab="photo">📸 Photo</button>
+    </div>
+    <div class="category-grid">
+      <div class="cat-card" data-cat="water"><img class="cat-img" src="https://images.unsplash.com/photo-1548839140-29a749e1cf4d?w=120&h=80&fit=crop&auto=format" alt="Water"><span class="label">Water</span></div>
+      <div class="cat-card" data-cat="garbage"><img class="cat-img" src="https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?w=120&h=80&fit=crop&auto=format" alt="Garbage"><span class="label">Garbage</span></div>
+      <div class="cat-card" data-cat="electric"><img class="cat-img" src="https://images.unsplash.com/photo-1466611653911-95081537e5b7?w=120&h=80&fit=crop&auto=format" alt="Electric"><span class="label">Electric</span></div>
+      <div class="cat-card" data-cat="forests"><img class="cat-img" src="https://images.unsplash.com/photo-1448375240586-882707db888b?w=120&h=80&fit=crop&auto=format" alt="Forests"><span class="label">Forests</span></div>
+      <div class="cat-card" data-cat="toilets"><img class="cat-img" src="https://images.unsplash.com/photo-1584622781564-1d987f7333c1?w=120&h=80&fit=crop&auto=format" alt="Toilets"><span class="label">Toilets</span></div>
+      <div class="cat-card" data-cat="roads"><img class="cat-img" src="https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=120&h=80&fit=crop&auto=format" alt="Roads"><span class="label">Roads</span></div>
+      <div class="cat-card" data-cat="crops"><img class="cat-img" src="https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=120&h=80&fit=crop&auto=format" alt="Crops"><span class="label">Crops</span></div>
+      <div class="cat-card" data-cat="other"><img class="cat-img" src="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=120&h=80&fit=crop&auto=format" alt="Other"><span class="label">Other</span></div>
+    </div>
+    <div class="voice-record" id="voicePanel">
+      <button class="mic-btn" id="micBtn">🎤</button>
+      <div class="voice-timer" id="voiceTimer" style="display:none">0:00</div>
+      <p class="mic-label" id="micLabel">Tap to Start Recording</p>
+    </div>
+    <div class="text-area-wrapper" id="textPanel">
+      <textarea id="reportMessage" placeholder="Describe the problem in your own words..." data-i18n-placeholder="textPlaceholder"></textarea>
+    </div>
+    <div id="photoPanel" style="display:none">
+      <input type="file" id="photoInput" accept="image/*" style="margin-bottom:16px">
+    </div>
+    <input type="text" id="usernameField" class="username-field" placeholder="Enter your name (optional)..." data-i18n-placeholder="namePlaceholder">
+    <div class="village-input-wrap">
+      <input type="text" id="villageField" class="input-field" placeholder="Enter your village name..." data-i18n-placeholder="villagePlaceholder" autocomplete="off">
+      <div class="village-suggestions" id="villageSuggestions"></div>
+    </div>
+    <div class="anon-toggle">
+      <div class="toggle-switch on" id="anonToggle"></div>
+      <span style="font-size:14px;color:#666" data-i18n="anonLabel">Submit Anonymously</span>
+    </div>
+    <button class="btn-submit" id="submitReport">📤 Submit My Report</button>
+    <p class="secure-note" data-i18n="secureNote">🔒 Anonymous & Secure. We never share your personal information.</p>
+  </div>
+</section>
+
+<!-- ═══ SCORE DASHBOARD ═══ -->
+<section class="score-section" id="score">
+  <div class="container">
+    <div class="section-label gold reveal">COMMUNITY SCORE</div>
+    <h2 class="section-title white reveal">See How Your Village<br>Is Performing</h2>
+    <div class="score-search reveal"><span class="search-icon">🔍</span><input type="text" placeholder="Search your village..."></div>
+    <svg style="position:absolute;width:0;height:0"><defs>
+      <linearGradient id="scoreGradLg" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#2D7D46"/><stop offset="100%" stop-color="#E8A838"/>
+      </linearGradient>
+    </defs></svg>
+    <div class="score-main-card reveal">
+      <div class="score-left">
+        <div class="score-gauge-lg">
+          <svg viewBox="0 0 240 240">
+            <circle class="bg" cx="120" cy="120" r="100"/>
+            <circle class="fill" id="mainGauge" cx="120" cy="120" r="100"/>
+          </svg>
+          <div class="score-big-num"><span class="num" id="mainScore">0</span><br><span class="of">out of 1000</span></div>
+        </div>
+        <div class="badge-pill">🥈 SILVER VILLAGE</div>
+      </div>
+      <div class="score-right">
+        <h3 class="score-village-name">RAMPUR, MAHARASHTRA</h3>
+        <p class="score-updated">Updated 2 hours ago 🔄</p>
+        <div class="progress-item"><div class="progress-header"><span class="progress-label">💧 Water Management</span><span class="progress-score">78</span></div><div class="progress-bar"><div class="progress-fill fill-green" data-width="78"></div></div></div>
+        <div class="progress-item"><div class="progress-header"><span class="progress-label">🗑️ Waste Management <span class="progress-tag tag-warn">⚠️ Needs Work</span></span><span class="progress-score">61</span></div><div class="progress-bar"><div class="progress-fill fill-yellow" data-width="61"></div></div></div>
+        <div class="progress-item"><div class="progress-header"><span class="progress-label">⚡ Energy Saving <span class="progress-tag tag-excellent">⭐ Excellent</span></span><span class="progress-score">89</span></div><div class="progress-bar"><div class="progress-fill fill-gold" data-width="89"></div></div></div>
+        <div class="progress-item"><div class="progress-header"><span class="progress-label">🌳 Green Cover</span><span class="progress-score">70</span></div><div class="progress-bar"><div class="progress-fill fill-green" data-width="70"></div></div></div>
+        <div class="progress-item"><div class="progress-header"><span class="progress-label">🤝 Community Reports <span class="progress-tag tag-great">⭐ Great</span></span><span class="progress-score">82</span></div><div class="progress-bar"><div class="progress-fill fill-green" data-width="82"></div></div></div>
+        <div class="progress-item"><div class="progress-header"><span class="progress-label">🏥 Health & Hygiene <span class="progress-tag tag-warn">⚠️ Needs Work</span></span><span class="progress-score">62</span></div><div class="progress-bar"><div class="progress-fill fill-yellow" data-width="62"></div></div></div>
+      </div>
+    </div>
+    <div class="leaderboard reveal">
+      <h3>🏘️ Nearby Villages Ranking</h3>
+      <table class="leader-table">
+        <thead><tr><th>Rank</th><th>Village</th><th>Score</th><th>Badge</th><th>Trend</th><th></th></tr></thead>
+        <tbody>
+          <tr><td>🥇 1</td><td>Sundarpur</td><td>891</td><td>GOLD 🥇</td><td class="trend-up">↑ +12</td><td><button class="btn-view">Learn →</button></td></tr>
+          <tr class="you"><td>🥈 2</td><td>Rampur <span style="color:var(--golden);font-weight:700">← YOU</span></td><td>742</td><td>SILVER 🥈</td><td class="trend-up">↑ +8</td><td></td></tr>
+          <tr><td>🥉 3</td><td>Nandgaon</td><td>698</td><td>BRONZE 🥉</td><td class="trend-same">→ +0</td><td><button class="btn-view">View</button></td></tr>
+          <tr><td>4</td><td>Khedgaon</td><td>543</td><td>—</td><td class="trend-down">↓ -5</td><td><button class="btn-view">View</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="villageMap"></div>
+    <div class="share-buttons reveal">
+      <button class="share-btn" id="shareWA">📱 Share on WhatsApp</button>
+      <button class="share-btn" id="sharePrint">🖨️ Print Report</button>
+      <button class="share-btn" id="shareEmail">📧 Email to Panchayat</button>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SUGGESTIONS ═══ -->
+<section class="suggestions" id="suggest">
+  <div class="container">
+    <div class="section-label reveal"><span style="background:rgba(45,125,70,0.1);padding:4px 14px;border-radius:20px">AI POWERED SUGGESTIONS</span></div>
+    <h2 class="section-title reveal">Your Personalized Village<br>Development Roadmap</h2>
+    <div class="urgent-grid">
+      <div class="suggest-card urgent reveal">
+        <span class="suggest-badge badge-red">🚨 NEEDS IMPROVEMENT</span>
+        <div class="suggest-header"><span class="emoji">🗑️</span><div><h3>Waste Management</h3><span class="suggest-score">61/100</span></div></div>
+        <p style="color:#666;font-size:15px;margin-bottom:12px">Your waste management score is pulling down your village ranking.</p>
+        <ul class="action-list">
+          <li>Install 3 community dustbins at key locations (₹3,500)</li>
+          <li>Launch weekly Sunday cleaning drive with volunteers</li>
+          <li>Form 4-person waste collection teams by zone</li>
+          <li>Create composting area for organic kitchen waste</li>
+        </ul>
+        <div class="scheme-badge">💰 Swachh Bharat Mission — FUNDS AVAILABLE</div>
+        <div class="suggest-btns"><button class="btn-scheme" data-scheme="swachh" onclick="applyScheme('swachh')">🏛️ Apply for Scheme</button><button class="btn-share-s" onclick="shareWithPanchayat('Swachh Bharat Mission')">📤 Share with Panchayat</button></div>
+      </div>
+      <div class="suggest-card urgent reveal reveal-delay-1">
+        <span class="suggest-badge badge-red">🚨 NEEDS IMPROVEMENT</span>
+        <div class="suggest-header"><span class="emoji">🏥</span><div><h3>Health & Hygiene</h3><span class="suggest-score">62/100</span></div></div>
+        <p style="color:#666;font-size:15px;margin-bottom:12px">Health infrastructure needs attention.</p>
+        <ul class="action-list">
+          <li>Set up handwashing stations at 3 community points</li>
+          <li>Organize monthly health awareness camps</li>
+          <li>Install water purification at community well</li>
+          <li>Start mosquito control drive before monsoon</li>
+        </ul>
+        <div class="scheme-badge">💰 Jal Jeevan Mission — FUNDS AVAILABLE</div>
+        <div class="suggest-btns"><button class="btn-scheme" onclick="applyScheme('jaljeevan')">🏛️ Apply</button><button class="btn-share-s" onclick="contactBlockOffice()">📞 Contact Block Office</button></div>
+      </div>
+    </div>
+    <div class="urgent-grid">
+      <div class="suggest-card success reveal">
+        <span class="suggest-badge badge-green">✨ DOING GREAT!</span>
+        <div class="suggest-header"><span class="emoji">⚡</span><div><h3>Energy Saving</h3><span class="suggest-score">89/100</span></div></div>
+        <p style="color:#666;font-size:15px">Your village leads the district in solar adoption!</p>
+      </div>
+      <div class="suggest-card success reveal reveal-delay-1">
+        <span class="suggest-badge badge-green">✨ DOING GREAT!</span>
+        <div class="suggest-header"><span class="emoji">🤝</span><div><h3>Community Reports</h3><span class="suggest-score">82/100</span></div></div>
+        <p style="color:#666;font-size:15px">Active community engagement! More reports than 85% of peers.</p>
+      </div>
+    </div>
+    <div class="impact-banner reveal">
+      <p>Improving these 2 areas will boost your score by <strong>+180 points</strong> and unlock <strong>GOLD STATUS 🥇</strong></p>
+      <button>See Full Development Plan →</button>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ NO INTERNET ═══ -->
+<section class="access-section" id="access">
+  <div class="stars"></div>
+  <div class="container" style="position:relative;z-index:1">
+    <div class="section-label gold reveal">ACCESSIBLE TO EVERYONE</div>
+    <h2 class="section-title white reveal">No Internet?<br>No Problem at All.</h2>
+    <div class="access-grid">
+      <div class="access-card reveal reveal-delay-1">
+        <span class="access-icon">📞</span><h3>Free Phone Call</h3>
+        <div class="big-text">1800-XXX-XXXX</div>
+        <p>Completely FREE from any network</p>
+        <ul><li>Press 1 → Report Problem</li><li>Press 2 → Hear Village Score</li><li>Press 3 → Hear Suggestions</li><li>Press 4 → Talk to Volunteer</li></ul>
+        <span class="access-pill">Available in 10 Languages</span>
+      </div>
+      <div class="access-card reveal reveal-delay-2">
+        <span class="access-icon">💬</span><h3>SMS System</h3>
+        <div class="big-text">Send to: 56789</div>
+        <div class="code-text">SCORE RAMPUR → Village score</div>
+        <div class="code-text">REPORT WATER → File report</div>
+        <div class="code-text">SUGGEST → Get tips</div>
+        <div class="code-text">HELP → All commands</div>
+        <span class="access-pill">Works on ₹500 phone</span>
+      </div>
+      <div class="access-card reveal reveal-delay-3">
+        <span class="access-icon">📟</span><h3>USSD Code</h3>
+        <div class="big-text" style="font-size:28px">*123*ECO#</div>
+        <p>Dial from ANY phone</p><p>No network data consumed</p>
+        <span class="access-pill">All operators supported</span>
+      </div>
+      <div class="access-card reveal reveal-delay-4">
+        <span class="access-icon">📌</span><h3>Community Board</h3>
+        <div class="big-text" style="font-size:18px">Visit Panchayat Office</div>
+        <p>Physical score board updated</p><p>Every Monday morning</p><p>Volunteer reads scores aloud</p>
+        <span class="access-pill">No phone needed either</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CHAMPIONS ═══ -->
+<section class="champions" id="champions">
+  <div class="container">
+    <div class="section-label gold reveal">COMMUNITY HEROES</div>
+    <h2 class="section-title reveal">Meet This Month's<br>Village Champions</h2>
+    <div class="champ-grid">
+      <div class="champ-card reveal">
+        <div class="champ-trophy">🏆</div>
+        <div class="champ-avatar">👨‍🌾</div>
+        <div class="champ-role">🥇 TOP REPORTER</div>
+        <h3>Jamal Jagdev</h3>
+        <p class="champ-stat">23 Reports Submitted This Month</p>
+        <div class="champ-badges"><span class="champ-badge-pill">🛡️ Community Guardian</span><span class="champ-badge-pill">📢 Whistleblower</span></div>
+      </div>
+      <div class="champ-card reveal reveal-delay-1">
+        <div class="champ-trophy">🏅</div>
+        <div class="champ-avatar">👩‍💼</div>
+        <div class="champ-role">🥈 TOP PROBLEM SOLVER</div>
+        <h3>Sarpanch Kamala Devi</h3>
+        <p class="champ-stat">15 Issues Resolved This Month</p>
+        <div class="champ-badges"><span class="champ-badge-pill">🦸 Village Hero</span><span class="champ-badge-pill">⚡ Fast Responder</span></div>
+      </div>
+    </div>
+    <div class="points-card reveal">
+      <h3>🌟 How to Earn Points</h3>
+      <div class="points-list">
+        <div class="points-row"><span class="points-action">📢 Report an issue</span><span class="points-value">+10 pts</span></div>
+        <div class="points-row"><span class="points-action">✅ Report gets verified</span><span class="points-value">+20 pts</span></div>
+        <div class="points-row"><span class="points-action">📸 Add photo evidence</span><span class="points-value">+15 pts</span></div>
+        <div class="points-row"><span class="points-action">🤝 Help solve an issue</span><span class="points-value">+50 pts</span></div>
+        <div class="points-row"><span class="points-action">📣 Bring a new reporter</span><span class="points-value">+25 pts</span></div>
+        <div class="points-row"><span class="points-action">🏆 Monthly top reporter</span><span class="points-value">+200 pts</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ STORIES ═══ -->
+<section class="stories" id="stories">
+  <div class="container">
+    <div class="section-label gold reveal">REAL IMPACT STORIES</div>
+    <h2 class="section-title white reveal">Villages That<br>Transformed Themselves</h2>
+    <div class="stories-grid">
+      <div class="story-card reveal reveal-delay-1">
+        <div class="story-progress">431 <span class="story-arrow">→</span> 887 in 8 months</div>
+        <div class="story-village">Kalyanpur, Rajasthan 🏆 GOLD</div>
+        <p class="story-quote">"We had no idea where our water was going. EcoVoice showed us. Now we waste 60% less."</p>
+        <p class="story-author">— Pradhan Mohanlal Sharma</p>
+        <div class="story-impact"><span class="impact-pill">💧 60% less water waste</span><span class="impact-pill">👥 340 families</span></div>
+      </div>
+      <div class="story-card reveal reveal-delay-2">
+        <div class="story-progress">312 <span class="story-arrow">→</span> 756 in 6 months</div>
+        <div class="story-village">Govindpur, Bihar 🥈 SILVER</div>
+        <p class="story-quote">"Our children now have clean drinking water. EcoVoice connected us to Jal Jeevan Mission."</p>
+        <p class="story-author">— Sarpanch Meera Devi</p>
+        <div class="story-impact"><span class="impact-pill">🚰 Clean water</span><span class="impact-pill">👥 520 families</span></div>
+      </div>
+      <div class="story-card reveal reveal-delay-3">
+        <div class="story-progress">498 <span class="story-arrow">→</span> 834 in 10 months</div>
+        <div class="story-village">Anantapur, AP 🥈 SILVER</div>
+        <p class="story-quote">"Solar panels changed our village. Women no longer spend hours collecting firewood."</p>
+        <p class="story-author">— Lakshmi Narasimha</p>
+        <div class="story-impact"><span class="impact-pill">⚡ 90% solar</span><span class="impact-pill">🌳 200 trees planted</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SCHEMES ═══ -->
+<section class="schemes" id="schemes">
+  <div class="container">
+    <div class="section-label reveal">OFFICIAL GOVERNMENT SUPPORT</div>
+    <h2 class="section-title reveal">Access Funding Your<br>Village Deserves</h2>
+    <div class="schemes-grid">
+      <div class="scheme-card reveal reveal-delay-1">
+        <div class="scheme-icon">💧</div><span class="scheme-status">✅ OPEN FOR APPLICATIONS</span>
+        <h3>Jal Jeevan Mission</h3>
+        <ul><li>Piped water to every household</li><li>Water quality monitoring</li><li>Community water management</li></ul>
+        <div class="scheme-btns"><button class="btn-apply" onclick="applyScheme('jaljeevan')">🏛️ Apply Now</button><button class="btn-learn" onclick="learnMore('jaljeevan')">Learn More</button></div>
+      </div>
+      <div class="scheme-card reveal reveal-delay-2">
+        <div class="scheme-icon">🏠</div><span class="scheme-status">✅ OPEN FOR APPLICATIONS</span>
+        <h3>PM Awas Yojana</h3>
+        <ul><li>Pucca house for BPL families</li><li>₹1.20 lakh assistance</li><li>Toilet-linked construction</li></ul>
+        <div class="scheme-btns"><button class="btn-apply" onclick="applyScheme('pmawas')">🏛️ Apply Now</button><button class="btn-learn" onclick="learnMore('pmawas')">Learn More</button></div>
+      </div>
+      <div class="scheme-card reveal reveal-delay-3">
+        <div class="scheme-icon">🌱</div><span class="scheme-status">✅ OPEN FOR APPLICATIONS</span>
+        <h3>MGNREGA</h3>
+        <ul><li>100 days guaranteed employment</li><li>Rural infrastructure building</li><li>Water conservation works</li></ul>
+        <div class="scheme-btns"><button class="btn-apply" onclick="applyScheme('mgnrega')">🏛️ Apply Now</button><button class="btn-learn" onclick="learnMore('mgnrega')">Learn More</button></div>
+      </div>
+    </div>
+    <div class="schemes-banner reveal">
+      <p>Not sure which scheme fits your village?</p>
+      <button>🎤 Call 1800-XXX-XXXX — We'll Guide You Free</button>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ STATS ═══ -->
+<section class="stats-section" id="stats">
+  <div class="container">
+    <div class="stats-grid">
+      <div class="stat-item reveal"><div class="stat-number" data-target="34291"><span class="counter">0</span><span class="stat-suffix">+</span></div><div class="stat-label">Reports Submitted</div></div>
+      <div class="stat-item reveal reveal-delay-1"><div class="stat-number" data-target="2400"><span class="counter">0</span><span class="stat-suffix">+</span></div><div class="stat-label">Active Villages</div></div>
+      <div class="stat-item reveal reveal-delay-2"><div class="stat-number" data-target="18543"><span class="counter">0</span></div><div class="stat-label">Issues Resolved</div></div>
+      <div class="stat-item reveal reveal-delay-3"><div class="stat-number" data-target="12"><span class="counter">0</span></div><div class="stat-label">States Covered</div></div>
+    </div>
+    <div class="live-ticker reveal">
+      <div class="ticker-content">
+        <span>🔴 LIVE: Sunita from Pune just reported a water leak</span>
+        <span>✅ Pothole in Nashik village RESOLVED</span>
+        <span>🏆 Kalyanpur just reached GOLD status!</span>
+        <span>📢 New report: Electric outage in Wardha</span>
+        <span>🔴 LIVE: Sunita from Pune just reported a water leak</span>
+        <span>✅ Pothole in Nashik village RESOLVED</span>
+        <span>🏆 Kalyanpur just reached GOLD status!</span>
+        <span>📢 New report: Electric outage in Wardha</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ DOWNLOAD ═══ -->
+<section class="download" id="download">
+  <div class="container">
+    <div class="download-inner">
+      <div class="download-left reveal">
+        <div class="section-label">GET THE APP</div>
+        <h2 style="font-family:var(--font-heading);font-size:42px">Take EcoVoice<br>Everywhere</h2>
+        <ul class="download-features"><li>Lite App — Works on 2G networks</li><li>Offline mode — No internet required</li><li>Voice reports in 10+ languages</li><li>Real-time village score updates</li></ul>
+        <div class="download-btns">
+          <button class="btn-lite">📱 Lite App (2MB)</button>
+          <button class="btn-pdf">💾 Offline PDF Guide</button>
+          <button class="btn-whatsapp">📲 Share on WhatsApp</button>
+        </div>
+      </div>
+      <div class="download-right reveal">
+        <div class="phone-mockup"><div class="phone-screen">
+          <div class="app-header">🌱 EcoVoice</div>
+          <div class="mini-score"><div class="num">742</div><div style="font-size:12px;color:#888">Your Village Score</div></div>
+          <div class="mini-btn" style="margin-bottom:8px">🎤 Report Problem</div>
+          <div class="mini-btn" style="background:var(--emerald)">📊 View Score</div>
+        </div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FOOTER ═══ -->
+<footer class="footer" id="footer">
+  <svg class="footer-wave" viewBox="0 0 1440 80" preserveAspectRatio="none"><path d="M0,40 C360,80 720,0 1080,40 C1260,60 1380,40 1440,40 L1440,80 L0,80 Z" fill="#0A1F14"/></svg>
+  <div class="container">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <div class="logo">🌱 EcoVoice</div>
+        <div class="tagline">Empowering Rural India, One Village at a Time</div>
+        <div class="social-icons"><a class="social-icon">𝕏</a><a class="social-icon">f</a><a class="social-icon">in</a><a class="social-icon">▶</a></div>
+      </div>
+      <div class="footer-cols">
+        <div class="footer-col"><h4>Platform</h4><a href="#">Report Issue</a><a href="#">Village Score</a><a href="#">Suggestions</a><a href="#">Leaderboard</a></div>
+        <div class="footer-col"><h4>Resources</h4><a href="#">How It Works</a><a href="#">Govt. Schemes</a><a href="#">FAQ</a><a href="#">Blog</a></div>
+        <div class="footer-col"><h4>Languages</h4><a href="#">हिन्दी</a><a href="#">తెలుగు</a><a href="#">தமிழ்</a><a href="#">ਪੰਜਾਬੀ</a></div>
+      </div>
+      <div class="footer-contact">
+        <p>📞 <span class="highlight">1800-XXX-XXXX</span> (Free 24/7)</p>
+        <p>💬 SMS 56789</p><p>📟 *123*ECO#</p><p>📧 help@ecovoice.in</p>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span class="footer-supported">Supported by: Ministry of Panchayati Raj, Govt. of India 🇮🇳</span>
+      <div class="footer-legal"><a href="#">Privacy</a><a href="#">Terms</a><a href="#">© 2026 EcoVoice</a></div>
+    </div>
+  </div>
+</footer>
+
+<!-- Mobile Bottom Bar -->
+<div class="mobile-bar"><div class="mobile-bar-inner">
+  <a href="#report"><span class="icon">🎤</span>Report</a>
+  <a href="#score"><span class="icon">📊</span>Score</a>
+  <a href="#suggest"><span class="icon">💡</span>Suggest</a>
+  <a href="#footer"><span class="icon">📞</span>Call</a>
+</div></div>
+
+<!-- Background Music -->
+<audio id="bgMusic" loop preload="auto">
+  <source src="https://www.bensound.com/bensound-music/bensound-acousticbreeze.mp3" type="audio/mpeg">
+</audio>
+
+<!-- Scheme Apply Modal -->
+<div id="schemeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10000;align-items:center;justify-content:center">
+  <div style="background:white;border-radius:24px;padding:40px;max-width:480px;width:90%;position:relative;animation:toastIn 0.3s ease">
+    <button onclick="closeSchemeModal()" style="position:absolute;top:16px;right:16px;background:none;border:none;font-size:24px;cursor:pointer">✕</button>
+    <div id="schemeModalContent"></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="js/translations.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
